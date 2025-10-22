@@ -11,12 +11,7 @@ class SerieAModel:
         self.le_result = LabelEncoder()
 
     def add_result_column(self, df):
-        """
-        Aggiunge la colonna 'result' al DataFrame:
-        - 'H' se vittoria casa
-        - 'A' se vittoria ospite
-        - 'D' se pareggio
-        """
+        """Aggiunge la colonna 'result': H = vittoria casa, A = vittoria ospite, D = pareggio"""
         def compute_result(row):
             if row['home_goals'] > row['away_goals']:
                 return 'H'
@@ -24,23 +19,32 @@ class SerieAModel:
                 return 'A'
             else:
                 return 'D'
-        
+
         df['result'] = df.apply(compute_result, axis=1)
+        return df
+
+    def normalize_teams(self, df):
+        """Rimuove spazi e converte i nomi delle squadre in minuscolo"""
+        df['home_team'] = df['home_team'].str.strip().str.lower()
+        df['away_team'] = df['away_team'].str.strip().str.lower()
         return df
 
     def train(self, df):
         print("🎯 Addestramento del modello...")
 
-        # Aggiungi la colonna result
+        # Normalizza nomi squadre
+        df = self.normalize_teams(df)
+
+        # Aggiungi colonna result
         df = self.add_result_column(df)
 
-        # Codifica tutte le squadre insieme
+        # Codifica squadre
         all_teams = pd.concat([df['home_team'], df['away_team']])
         self.le_team.fit(all_teams)
         df['home_team_enc'] = self.le_team.transform(df['home_team'])
         df['away_team_enc'] = self.le_team.transform(df['away_team'])
 
-        # Codifica il target
+        # Codifica target
         df['result_enc'] = self.le_result.fit_transform(df['result'])
 
         # Features e target
@@ -50,7 +54,7 @@ class SerieAModel:
         # Train/test split
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Addestra il modello
+        # Addestra modello
         self.model.fit(X_train, y_train)
 
         # Valutazione
@@ -59,7 +63,11 @@ class SerieAModel:
         print(f"✅ Accuracy modello: {acc:.2f}")
 
     def predict(self, home_team, away_team):
-        # Controlla che le squadre siano presenti
+        # Normalizza input utente
+        home_team = home_team.strip().lower()
+        away_team = away_team.strip().lower()
+
+        # Controllo squadre (verrà gestito da main con ricerca fuzzy)
         if home_team not in self.le_team.classes_ or away_team not in self.le_team.classes_:
             return "❌ Squadra non presente nel dataset."
 
