@@ -24,55 +24,58 @@ class SerieAModel:
         return df
 
     def normalize_teams(self, df):
-        """Rimuove spazi e converte i nomi delle squadre in minuscolo"""
         df['home_team'] = df['home_team'].str.strip().str.lower()
         df['away_team'] = df['away_team'].str.strip().str.lower()
         return df
 
     def train(self, df):
         print("🎯 Addestramento del modello...")
-
-        # Normalizza nomi squadre
         df = self.normalize_teams(df)
-
-        # Aggiungi colonna result
         df = self.add_result_column(df)
 
-        # Codifica squadre
         all_teams = pd.concat([df['home_team'], df['away_team']])
         self.le_team.fit(all_teams)
         df['home_team_enc'] = self.le_team.transform(df['home_team'])
         df['away_team_enc'] = self.le_team.transform(df['away_team'])
 
-        # Codifica target
         df['result_enc'] = self.le_result.fit_transform(df['result'])
 
-        # Features e target
         X = df[['home_team_enc', 'away_team_enc']]
         y = df['result_enc']
 
-        # Train/test split
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-        # Addestra modello
         self.model.fit(X_train, y_train)
 
-        # Valutazione
         y_pred = self.model.predict(X_test)
         acc = accuracy_score(y_test, y_pred)
         print(f"✅ Accuracy modello: {acc:.2f}")
 
     def predict(self, home_team, away_team):
-        # Normalizza input utente
         home_team = home_team.strip().lower()
         away_team = away_team.strip().lower()
 
-        # Controllo squadre (verrà gestito da main con ricerca fuzzy)
         if home_team not in self.le_team.classes_ or away_team not in self.le_team.classes_:
             return "❌ Squadra non presente nel dataset."
 
         home_enc = self.le_team.transform([home_team])[0]
         away_enc = self.le_team.transform([away_team])[0]
+
         pred = self.model.predict([[home_enc, away_enc]])[0]
         result = self.le_result.inverse_transform([pred])[0]
         return result
+
+    def predict_proba(self, home_team, away_team):
+        """Restituisce le probabilità di vittoria casa, pareggio e vittoria ospite"""
+        home_team = home_team.strip().lower()
+        away_team = away_team.strip().lower()
+
+        if home_team not in self.le_team.classes_ or away_team not in self.le_team.classes_:
+            return None
+
+        home_enc = self.le_team.transform([home_team])[0]
+        away_enc = self.le_team.transform([away_team])[0]
+
+        probs = self.model.predict_proba([[home_enc, away_enc]])[0]
+        # Associa le probabilità ai risultati corretti
+        result_labels = self.le_result.inverse_transform(range(len(probs)))
+        return dict(zip(result_labels, probs))
