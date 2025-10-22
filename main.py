@@ -3,7 +3,6 @@ from model import SerieAModel
 from difflib import get_close_matches
 
 def find_team(name, teams):
-    """Restituisce il nome della squadra più simile (case-insensitive)"""
     matches = get_close_matches(name.lower(), teams, n=1, cutoff=0.6)
     return matches[0] if matches else None
 
@@ -12,7 +11,6 @@ def main():
     model = SerieAModel()
     model.train(df)
 
-    # Lista di tutte le squadre normalizzate
     all_teams = [t.lower() for t in model.le_team.classes_]
 
     print("\n⚠️ Squadre disponibili:")
@@ -26,15 +24,21 @@ def main():
             break
         away = input("Inserisci la squadra ospite: ")
 
-        # Ricerca fuzzy per trovare la squadra più simile
         home_team_corrected = find_team(home, all_teams)
         away_team_corrected = find_team(away, all_teams)
 
         if home_team_corrected is None or away_team_corrected is None:
             print("❌ Squadra non presente nel dataset.")
-        else:
-            prediction = model.predict(home_team_corrected, away_team_corrected)
-            print(f"🔮 Predizione: {home.title()} vs {away.title()} → {prediction}")
+            continue
+
+        result = model.predict(home_team_corrected, away_team_corrected)
+        probs = model.predict_proba(home_team_corrected, away_team_corrected)
+
+        print(f"🔮 Predizione: {home.title()} vs {away.title()} → {result}")
+        if probs:
+            print("📊 Probabilità:")
+            for k, v in probs.items():
+                print(f"  {k}: {v:.2f}")
 
 if __name__ == "__main__":
     main()
