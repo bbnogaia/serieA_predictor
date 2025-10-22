@@ -1,30 +1,22 @@
 from data_loader import load_data
 from model import SerieAModel
+from difflib import get_close_matches
 
-def add_result_column(df):
-    """
-    Aggiunge la colonna 'result' al DataFrame:
-    - 'H' se vittoria casa
-    - 'A' se vittoria ospite
-    - 'D' se pareggio
-    """
-    def compute_result(row):
-        if row['home_goals'] > row['away_goals']:
-            return 'H'
-        elif row['home_goals'] < row['away_goals']:
-            return 'A'
-        else:
-            return 'D'
-
-    df['result'] = df.apply(compute_result, axis=1)
-    return df
-
+def find_team(name, teams):
+    """Restituisce il nome della squadra più simile (case-insensitive)"""
+    matches = get_close_matches(name.lower(), teams, n=1, cutoff=0.6)
+    return matches[0] if matches else None
 
 def main():
     df = load_data(2018, 2022)
-    df = add_result_column(df)
     model = SerieAModel()
     model.train(df)
+
+    # Lista di tutte le squadre normalizzate
+    all_teams = [t.lower() for t in model.le_team.classes_]
+
+    print("\n⚠️ Squadre disponibili:")
+    print(", ".join(sorted([t.title() for t in all_teams])))
 
     while True:
         print("\n⚽ Previsione partita Serie A")
@@ -34,8 +26,15 @@ def main():
             break
         away = input("Inserisci la squadra ospite: ")
 
-        prediction = model.predict(home, away)
-        print(f"🔮 Predizione: {home} vs {away} → {prediction}")
+        # Ricerca fuzzy per trovare la squadra più simile
+        home_team_corrected = find_team(home, all_teams)
+        away_team_corrected = find_team(away, all_teams)
+
+        if home_team_corrected is None or away_team_corrected is None:
+            print("❌ Squadra non presente nel dataset.")
+        else:
+            prediction = model.predict(home_team_corrected, away_team_corrected)
+            print(f"🔮 Predizione: {home.title()} vs {away.title()} → {prediction}")
 
 if __name__ == "__main__":
     main()
